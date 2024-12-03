@@ -1,9 +1,9 @@
 use std::{fs::read_to_string, usize};
 
-pub fn find_safe_reports(input_path: &str, tolerance: u32) -> u32 {
+pub fn find_safe_reports(input_path: &str) -> u32 {
     let puzzle = extract_puzzle(input_path);
 
-    safe_reports(&puzzle, tolerance)
+    safe_reports(&puzzle)
 }
 
 fn extract_puzzle(input_path: &str) -> Puzzle {
@@ -16,13 +16,13 @@ fn extract_puzzle(input_path: &str) -> Puzzle {
     puzzle
 }
 
-fn safe_reports(puzzle: &Puzzle, tolerance: u32) -> u32 {
+fn safe_reports(puzzle: &Puzzle) -> u32 {
     if puzzle.reports.is_empty() {
         return 0;
     }
     let mut safe_count = 0;
     puzzle.reports.iter().for_each(|report| {
-        if report.is_safe(tolerance as usize) {
+        if report.is_safe() {
             safe_count += 1;
         }
     });
@@ -42,77 +42,40 @@ struct Report {
 }
 
 impl Report {
-
     fn is_safe_at_index(&self, index: usize) -> bool {
         if index == self.values.len() - 1 {
             return true;
         }
         let value = self.values[index];
         let next_value = self.values[index + 1];
-    
+
         value.abs_diff(next_value) > 0 && value.abs_diff(next_value) < 4
     }
-    
+
     fn is_wright_order(&self, index: usize) -> bool {
         if index == self.values.len() - 1 {
             return true;
         }
         let value = self.values[index];
         let next_value = self.values[index + 1];
-    
+
         if self.is_ascending() {
             return next_value > value;
         }
         next_value < value
     }
-    
+
     fn is_ascending(&self) -> bool {
         self.values.len() >= 2 && self.values[0] < self.values[1]
     }
 
-    fn is_safe(&self, tolerance: usize) -> bool {
-        if self.values.is_empty() {
-            return false;
+    fn is_safe(&self) -> bool {
+        for i in 0..self.values.len()  {
+            if !self.is_safe_at_index(i) || !self.is_wright_order(i) {
+                return false;
+            }
         }
-        
-        if tolerance == 0 {
-            return self.values.iter().enumerate().all(|(i, _)| self.is_safe_at_index(i) && self.is_wright_order(i));
-        }
-
-        let n = self.values.len();
-        let required_len = n.saturating_sub(tolerance);
-
-        self.get_subsequences(required_len)
-        .iter()
-        .any(|subsequence| Report { values: subsequence.clone() }.is_safe(0))
-    }
-    
-    fn get_subsequences(&self, length: usize) -> Vec<Vec<u32>> {
-        let mut subsequences = Vec::new();
-        let values = &self.values;
-        let mut current = Vec::new();
-        generate_subsequences(values, 0, length, &mut current, &mut subsequences);
-        subsequences
-    }
-}
-
-
-
-fn generate_subsequences(
-    values: &[u32],
-    start: usize,
-    length: usize,
-    current: &mut Vec<u32>,
-    result: &mut Vec<Vec<u32>>,
-) {
-    if current.len() == length {
-        result.push(current.clone());
-        return;
-    }
-    for i in start..values.len() {
-        current.push(values[i]);
-        generate_subsequences(values, i + 1, length, current, result);
-        current.pop();
+        true
     }
 }
 
@@ -140,49 +103,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn should_safe_reports_0_when_tolerant_but_over_on_first_element() {
-        assert_eq!(safe_reports(&Puzzle {
-            reports: vec![Report {
-                values: vec![1, 7, 6, 3, 1]
-            }]
-        }, 1), 1);
-    }
-
-    #[test]
-    fn should_safe_reports_0_when_tolerant_but_over_on_last_element() {
-        assert_eq!(safe_reports(&Puzzle {
-            reports: vec![Report {
-                values: vec![9, 7, 6, 5, 1]
-            }]
-        }, 1), 1);
-    }
-
-    #[test]
-    fn should_safe_reports_0_when_tolerant_but_over() {
-        assert_eq!(safe_reports(&Puzzle {
-            reports: vec![Report {
-                values: vec![9, 7, 6, 2, 1]
-            }]
-        }, 1), 0);
-    }
-
-    #[test]
-    fn should_safe_reports_1_when_tolerant() {
-        assert_eq!(safe_reports(&Puzzle {
-            reports: vec![Report {
-                values: vec![1, 3, 2]
-            }]
-        }, 1), 1);
-    }
-
-
-    #[test]
     fn should_safe_reports_0_when_safe_distance_but_not_always_increasing() {
         assert_eq!(safe_reports(&Puzzle {
             reports: vec![Report {
                 values: vec![1, 3, 1]
             }]
-        }, 0), 0);
+        }), 0);
     }
 
     #[test]
@@ -193,7 +119,7 @@ mod tests {
             }, Report {
                 values: vec![1, 2]
             }]
-        }, 0), 2);
+        }), 2);
     }
    
     #[test]
@@ -202,7 +128,7 @@ mod tests {
             reports: vec![Report {
                 values: vec![1, 5]
             }]
-        }, 0), 0);
+        }), 0);
     }
 
     #[test]
@@ -211,7 +137,7 @@ mod tests {
             reports: vec![Report {
                 values: vec![1, 1]
             }]
-        }, 0), 0);
+        }), 0);
     }
 
 
@@ -221,14 +147,14 @@ mod tests {
             reports: vec![Report {
                 values: vec![1, 2]
             }]
-        }, 0), 1);
+        }), 1);
     }
 
     #[test]
     fn should_safe_reports_0_when_empty_reports() {
         assert_eq!(safe_reports(&Puzzle {
             reports: vec![]
-        }, 0), 0);
+        }), 0);
     }
 
     #[test]
@@ -255,6 +181,14 @@ mod tests {
             }]
         })
         
+    }
+
+    #[test]
+    fn should_report_is_safe_return_true_when_one_element() {
+        let report = Report {
+            values: vec![1]
+        };
+        assert_eq!(report.is_safe_at_index(0), true)
     }
 
     
